@@ -2,7 +2,6 @@ import abc
 from typing import Callable
 
 import torch as th
-import numpy as np
 import torch.nn.functional as F
 
 
