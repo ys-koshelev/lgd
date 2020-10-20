@@ -190,3 +190,22 @@ class DownscaleDegradation(BlurDegradation):
         :return: coordinate (same for both horizontal and vertical axes)
         """
         return self.scale_factor//2 + self.scale_factor%2 - 1
+
+    def init_latent_images(self, degraded_images: th.Tensor) -> th.Tensor:
+        """
+        This method is used to init latent images from degraded ones for the first restoration step.
+        For linear downscale degradation nearest neighbours upsampling suits better for initialization.
+        This is similar to transposed decimation, but zeros are filled with neighbouring pixels intensity values.
+
+        :param degraded_images: batch of images of shape [B, C1, H1, W1] to create latent ones
+        :return: initialized latent images of shape [B, C2, H2, W2]
+        """
+        coordinate = self._get_pixel_coords_for_decimation()
+        hw = [i * self.scale_factor for i in degraded_images.shape[2:]]
+        upscaled = th.zeros(*degraded_images.shape[:2], *hw, dtype=degraded_images.dtype, device=degraded_images.device)
+        upscaled = upscaled.unfold(-2, self.scale_factor, self.scale_factor).unfold(-2, self.scale_factor,
+                                                                                    self.scale_factor)
+        upscaled[:, :, :, :, coordinate, coordinate] = degraded_images.unsqueeze(0).unsqueeze(0)
+        upscaled = upscaled.permute(0, 1, 4, 5, 2, 3).flatten(start_dim=-2).flatten(start_dim=1, end_dim=-2)
+        upscaled = F.fold(upscaled, hw, self.scale_factor, stride=self.scale_factor)
+        return upscaled

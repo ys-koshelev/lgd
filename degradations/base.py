@@ -2,6 +2,7 @@ import abc
 from typing import Callable
 
 import torch as th
+import torch.nn as nn
 import torch.nn.functional as F
 
 
@@ -53,6 +54,15 @@ class DegradationBase:
         grad = th.autograd.grad(data_fidelity, latent_images)[0]
         latent_images.requires_grad = False
         return grad
+
+    def init_latent_images(self, degraded_images: th.Tensor) -> th.Tensor:
+        """
+        This method is used to init latent images from degraded ones for the first restoration step.
+
+        :param degraded_images: batch of images of shape [B, C1, H1, W1] to create latent ones
+        :return: initialized latent images of shape [B, C2, H2, W2]
+        """
+        return degraded_images
 
     def degrade_ground_truth(self, gt_images: th.Tensor) -> th.Tensor:
         """
@@ -121,3 +131,43 @@ class LinearDegradationBase(DegradationBase):
         std = std*(std_max - std_min) + std_min
         degraded += th.randn_like(degraded)*std
         return degraded
+
+    def init_latent_images(self, degraded_images: th.Tensor) -> th.Tensor:
+        """
+        This method is used to init latent images from degraded ones for the first restoration step.
+        For linear degradation the transposed operation is usually used as approximation of inversed one.
+
+        :param degraded_images: batch of images of shape [B, C1, H1, W1] to create latent ones
+        :return: initialized latent images of shape [B, C2, H2, W2]
+        """
+        return self.linear_transform_transposed(degraded_images)
+
+
+class NetworkDegradationBase(DegradationBase):
+    """
+    This class represents degradation, approximated by some neural network (NN)
+    """
+    def __init__(self, degradation_network: nn.Module, likelihood_loss: Callable, device: str = 'cpu') -> None:
+        super().__init__(likelihood_loss)
+        self.degradation_network = degradation_network.to(device=device)
+        self.degradation_network.train(False)
+        for param in self.degradation_network.parameters():
+            param.requires_grad = False
+
+    def degrade(self, images: th.Tensor) -> th.Tensor:
+        """
+        This method performs degradation of input data, assuming that degradation model is approximated by NN.
+
+        :param images: input batch of images [B, C1, H1, W1], which should be degraded
+        :return: batch of degraded images [B, C2, H2, W2]
+        """
+        return self.degradation_network(self._normalize(images))
+
+    def _normalize(self, images: th.Tensor) -> th.Tensor:
+        """
+        Method, which normalizes images before passing it to neural network.
+
+        :param images: batch of images of shape [B, C, H, W] to normalize
+        :return: batch of normalized images of shape [B, C, H, W]
+        """
+        return images
