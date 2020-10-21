@@ -55,21 +55,6 @@ class TestLinearDegradationBase(TestDegradationBase):
     degradation_class: LinearDegradationBase
     __test__ = False
 
-    def test_transform_transposed_decorated(self, batch_size, channels_number, spatial_dims, **kwargs):
-        """
-        Checks correctness of implementation of linear transposed operator, using property of dot product:
-        (A x, y) = (x, A^T y)
-        """
-        self.init_test_class(batch_size, channels_number, spatial_dims, **kwargs)
-        vec_a = th.rand(batch_size, channels_number, spatial_dims[0], spatial_dims[1]).double()
-        Avec_a = self.degradation_class.linear_transform(vec_a)
-        vec_b = th.rand_like(Avec_a)
-        A_Tvec_b = self.degradation_class.linear_transform_transposed(vec_b)
-
-        prod_1 = self._prod(Avec_a, vec_b)
-        prod_2 = self._prod(vec_a, A_Tvec_b)
-        assert th.all(th.isclose(prod_1, prod_2))
-
     def test_transform_transposed(self, kwargs=None):
         """
         Checks correctness of implementation of linear transposed operator, using property of dot product:

@@ -1,9 +1,9 @@
 import abc
 from typing import List
 
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.ndimage import measurements, interpolation
-import matplotlib.pyplot as plt
 
 
 class KernelSamplerBase:
@@ -47,7 +47,8 @@ class GaussianKernelSampler(KernelSamplerBase):
     def __init__(self, kernel_size: int, scale_factor: int, min_eigval: float = 0.35, max_eigval: float = 5,
                  min_noise_level: float = 0, max_noise_level: float = 0.4) -> None:
         """
-        Initializing parameters of kernels sampler
+        Initializing parameters of kernels sampler.
+        Use scale_factor=1 for blur kernels and scale_factor > 1 for downscale kernels.
 
         :param kernel_size: size of canvas to be used for sampling
         :param scale_factor: scale factor of super-resolution problem
