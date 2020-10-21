@@ -33,7 +33,7 @@ class KernelSamplerBase:
         plt.show()
 
 
-class SuperResolutionKernelSampler(KernelSamplerBase):
+class GaussianKernelSampler(KernelSamplerBase):
     """
     Class, that samples random noisy bi-variate Gaussian kernels.
     Credit: https://github.com/assafshocher/BlindSR_dataset_generator/blob/master/BSD100RK.ipynb
@@ -131,7 +131,7 @@ class SuperResolutionKernelSampler(KernelSamplerBase):
         return kernel
 
 
-class BlurKernelSampler(KernelSamplerBase):
+class ShakeKernelSampler(KernelSamplerBase):
     """
     Class, that samples random motion blur kernels.
     References
