@@ -49,7 +49,7 @@ class DegradationBase:
 
         :param degraded_images: batch of degraded images
         :param latent_images: batch of current latent images estimate
-        :param propagate_gradients_through_grad: if True, gradients will be backpropagated through this operation
+        :param propagate_gradients_through_grad: if True, gradients will be back propagated through this operation
         :return: gradient of data fidelity between degraded images and current latent estimates
         """
         def func(x):
@@ -206,7 +206,7 @@ class NetworkDegradationBase(DegradationBase):
         :param images: input batch of images [B, C1, H1, W1], which should be degraded
         :return: batch of degraded images [B, C2, H2, W2]
         """
-        return self.degradation_network(self._normalize_images(images))
+        return self._denormalize_images(self.degradation_network(self._normalize_images(images)))
 
     @staticmethod
     def _normalize_images(images: th.Tensor) -> th.Tensor:
