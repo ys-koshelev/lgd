@@ -1,5 +1,5 @@
 import abc
-from typing import Callable
+from typing import Callable, Union
 
 import torch as th
 import torch.nn as nn
@@ -22,6 +22,7 @@ class DegradationBase:
     def degrade(self, images: th.Tensor) -> th.Tensor:
         """
         This method performs degradation of input data, assuming some degradation model.
+        Only deterministic part of degradation routine is implemented by this method.
         IMPORTANT: This method should use only differentiable operations.
 
         :param images: input batch of images [B, C1, H1, W1], which should be degraded
@@ -73,6 +74,17 @@ class DegradationBase:
         :return: batch of degraded images [B, C2, H2, W2]
         """
         pass
+
+    def simulate(self, images: th.Tensor, **kwargs):
+        """
+        This method simulates the whole degradation pipeline, including its stochastic (noise) part.
+        Current implementation assumes that degradation is deterministic, override if it is not the case.
+
+        :param images: batch of input images of shape [B, C1, H1, W1] to be degraded
+        :param kwargs: auxillary parameters, required to properly simulate degradation
+        :return: degraded batch of images of shape [B, C2, H2, W2]
+        """
+        return self.degrade(images)
 
 
 class LinearDegradationBase(DegradationBase):
@@ -141,6 +153,32 @@ class LinearDegradationBase(DegradationBase):
         :return: initialized latent images of shape [B, C2, H2, W2]
         """
         return self.linear_transform_transposed(degraded_images)
+
+    def simulate(self, images: th.Tensor, noise_std: Union[float, th.Tensor]):
+        """
+        This method simulates the whole degradation pipeline, including additive noise.
+
+        :param images: batch of input images of shape [B, C1, H1, W1] to be degraded
+        :param noise_std: standard deviations of noise, float or tensor of shape [], [1] or [B]
+        :return: degraded batch of images of shape [B, C2, H2, W2]
+        """
+        degraded = self.degrade(images)
+        noise = th.randn_like(degraded)
+        if isinstance(noise_std, float):
+            noise *= noise_std
+        elif isinstance(noise_std, th.Tensor):
+            noise_std = noise_std.to(degraded)
+            if noise_std.ndim == 0 or (noise_std.ndim == 1 and noise_std.shape[0] == 1):
+                noise *= noise_std
+            elif noise_std.ndim == 1 and noise_std.shape[0] == degraded.shape[0]:
+                noise *= noise_std[:, None, None, None]
+            else:
+                raise ValueError(f'Expected standard deviations to have shapes [], [1] or [B], but received tensor '
+                                 f'with shape {noise_std.shape}')
+        else:
+            raise ValueError(f'Expected input parameter noise_std to be either float or torch.Tensor, '
+                             f'but given {noise.__class__}')
+        return degraded + noise
 
 
 class NetworkDegradationBase(DegradationBase):
