@@ -25,8 +25,8 @@ class SegmentationModule(SegmentationModuleBase):
         self.decoder = net_dec
 
     def forward(self, image):
-        pred = self.decoder(self.encoder(image, return_feature_maps=True))
-        return pred[0]
+        pred = self.decoder(self.encoder(image, return_feature_maps=True), segSize=image.shape[-2:])
+        return pred
 
 
 class SegmentationModuleWithCriterion(SegmentationModuleBase):
@@ -359,15 +359,17 @@ class C1DeepSup(nn.Module):
             x = nn.functional.softmax(x, dim=1)
             return x
 
-        # deep sup
-        conv4 = conv_out[-2]
-        _ = self.cbr_deepsup(conv4)
-        _ = self.conv_last_deepsup(_)
-
-        x = nn.functional.log_softmax(x, dim=1)
-        _ = nn.functional.log_softmax(_, dim=1)
-
-        return (x, _)
+        x = nn.functional.interpolate(x, size=segSize, mode='bilinear', align_corners=False)
+        return x
+        # # deep sup
+        # conv4 = conv_out[-2]
+        # _ = self.cbr_deepsup(conv4)
+        # _ = self.conv_last_deepsup(_)
+        #
+        # x = nn.functional.log_softmax(x, dim=1)
+        # _ = nn.functional.log_softmax(_, dim=1)
+        #
+        # return (x, _)
 
 
 # last conv
@@ -493,17 +495,18 @@ class PPMDeepsup(nn.Module):
                 x, size=segSize, mode='bilinear', align_corners=False)
             x = nn.functional.softmax(x, dim=1)
             return x
-
-        # deep sup
-        conv4 = conv_out[-2]
-        _ = self.cbr_deepsup(conv4)
-        _ = self.dropout_deepsup(_)
-        _ = self.conv_last_deepsup(_)
-
-        x = nn.functional.log_softmax(x, dim=1)
-        _ = nn.functional.log_softmax(_, dim=1)
-
-        return (x, _)
+        x = nn.functional.interpolate(x, size=segSize, mode='bilinear', align_corners=False)
+        return x
+        # # deep sup
+        # conv4 = conv_out[-2]
+        # _ = self.cbr_deepsup(conv4)
+        # _ = self.dropout_deepsup(_)
+        # _ = self.conv_last_deepsup(_)
+        #
+        # x = nn.functional.log_softmax(x, dim=1)
+        # _ = nn.functional.log_softmax(_, dim=1)
+        #
+        # return (x, _)
 
 
 # upernet
