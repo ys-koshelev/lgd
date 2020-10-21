@@ -35,7 +35,7 @@ class BlurDegradation(LinearDegradationBase):
     """
     def __init__(self, blur_kernels: th.Tensor, likelihood_loss: Callable = F.mse_loss) -> None:
         """
-        Initializing everything that is needed to perfrom degradation
+        Initializing everything that is needed to perform degradation
         """
         super().__init__(likelihood_loss)
         self.kernels = blur_kernels
@@ -47,7 +47,7 @@ class BlurDegradation(LinearDegradationBase):
         :param latent_images: input batch of images [B, C1, H1, W1], which should be degraded
         :return:batch of degraded images [B, C2, H2, W2]
         """
-        assert latent_images.shape[0] == self.kernels.shape[0], f'Number of images in batch is not equal to nubler ' \
+        assert latent_images.shape[0] == self.kernels.shape[0], f'Number of images in batch is not equal to number ' \
                                                                 f'of kernels. Given {latent_images.shape[0]} images ' \
                                                                 f'and {self.kernels.shape[0]} kernels.'
         if latent_images.device != self.kernels.device:
@@ -96,6 +96,17 @@ class BlurDegradation(LinearDegradationBase):
                                  groups=kernels.shape[0]).transpose(1, 0)
         return ret
 
+    def replace_kernels(self, new_kernels: th.Tensor) -> None:
+        """
+        This method allows to change degradation kernels inplace without re-initializing degradation class.
+
+        :param new_kernels: new kernels to be used to replace existing ones
+        :return: Nothing
+        """
+        assert new_kernels.ndim == 4
+        assert new_kernels.shape[1] == 1
+        self.kernels = new_kernels.to(self.kernels)
+
 
 class DownscaleDegradation(BlurDegradation):
     """
@@ -104,7 +115,7 @@ class DownscaleDegradation(BlurDegradation):
     """
     def __init__(self, scale_factor: int, downscale_kernels: th.Tensor, likelihood_loss: Callable = F.mse_loss) -> None:
         """
-        Initializing kernels and scale factor needed to perfrom degradation
+        Initializing kernels and scale factor needed to perform degradation
         """
         super().__init__(downscale_kernels, likelihood_loss)
         self.scale_factor = scale_factor
@@ -160,8 +171,8 @@ class DownscaleDegradation(BlurDegradation):
 
     def _decimate_transposed(self, images: th.Tensor) -> th.Tensor:
         """
-        Class that performs upscaling of input image by transposed decimation operation.
-        Example of such operation for 2x upscaling is given below:
+        Class that performs upscale of input image by transposed decimation operation.
+        Example of such operation for 2x upscale is given below:
         ...|+0| |+0| |+0| |+0|...
         ...|00| |00| |00| |00|...
         -------------------------
@@ -170,7 +181,7 @@ class DownscaleDegradation(BlurDegradation):
         Here  '+' - pixels from input image, which are padded with zeros to construct image of higher resolution.
 
         :param images: batch of input images with shape [B, C, H, W] to upscale
-        :return: batch of upscaled images with shape [B, C, H*self.scale_factor, W*self.scale_factor]
+        :return: batch of scaled images with shape [B, C, H*self.scale_factor, W*self.scale_factor]
         """
         coordinate = self._get_pixel_coords_for_decimation()
         hw = [i * self.scale_factor for i in images.shape[2:]]
@@ -194,7 +205,7 @@ class DownscaleDegradation(BlurDegradation):
     def init_latent_images(self, degraded_images: th.Tensor) -> th.Tensor:
         """
         This method is used to init latent images from degraded ones for the first restoration step.
-        For linear downscale degradation nearest neighbours upsampling suits better for initialization.
+        For linear downscale degradation nearest neighbours upscale suits better for initialization.
         This is similar to transposed decimation, but zeros are filled with neighbouring pixels intensity values.
 
         :param degraded_images: batch of images of shape [B, C1, H1, W1] to create latent ones

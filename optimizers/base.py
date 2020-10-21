@@ -2,7 +2,7 @@ from degradations import DegradationBase
 import torch as th
 import torch.nn as nn
 import abc
-from typing import Tuple, Callable
+from typing import Callable
 
 
 class OptimizerBase:
@@ -23,7 +23,7 @@ class OptimizerBase:
         :param degradation: function, which provides degradation model
         :param num_steps: number of optimizer steps to perform for restoration
         :param prior_function: function, which is called to calculate images priors
-        :param prior_weight: regularization weight to scale the prior value properly (usually is as hyperparameter)
+        :param prior_weight: regularization weight to scale the prior value properly (usually is as hyper-parameter)
         :param projection_function: function, which is called to explicitly project images to some specific domain
         """
         self.degradation = degradation
@@ -74,7 +74,7 @@ class OptimizerBase:
         latent_images = self.degradation.init_latent_images(degraded_images)
         for i in range(self.num_steps):
             latent_images = self.perform_step(latent_images, degraded_images)
-            latent_images = self.project_images(latent_images)
+            latent_images = self.project(latent_images)
         return latent_images
 
     def project(self, images: th.Tensor) -> th.Tensor:
@@ -83,7 +83,7 @@ class OptimizerBase:
         This is sometimes needed to force images to stay in specific domain during optimization.
         For example, if we are working with natural images, we may desire their values to lie within [0, 1] limits.
 
-        :param latent_images: batch of images of shape [B, C, H, W] for projection
+        :param images: batch of images of shape [B, C, H, W] for projection
         :return: projected images of shape [B, C, H, W]
         """
         return self.projection_function(images)
@@ -96,9 +96,10 @@ class CNNOptimizerBase(OptimizerBase, nn.Module):
     degradation: DegradationBase
     latent_image: th.Tensor
     optimizer_network: nn.Module
+
     def __init__(self, network: nn.Module, num_steps: int) -> None:
         """
-        Initialize a CNN optim
+        Initialize a CNN optimizer
         :param network:
         :param num_steps:
         """

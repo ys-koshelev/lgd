@@ -12,7 +12,7 @@ class DegradationBase:
     """
     def __init__(self, likelihood_loss: Callable) -> None:
         """
-        Initializing everything that is needed to perfrom degradation
+        Initializing everything that is needed to perform degradation
 
         :param likelihood_loss: callable function to compute loss, should return a tensor of size 1
         """
@@ -68,7 +68,7 @@ class DegradationBase:
     def degrade_ground_truth(self, gt_images: th.Tensor) -> th.Tensor:
         """
         Auxiliary method to perform synthetic degradation of ground truth images, assuming known degradation model
-        IMPORTANT: implementation for the case, when degradation is deterministic. May contatin non-differetiable ops.
+        IMPORTANT: implementation for the case, when degradation is deterministic. May contain non-differentiable ops.
 
         :param gt_images: batch of images [B, C1, H1, W1] to perform a synthetic degradation
         :return: batch of degraded images [B, C2, H2, W2]
@@ -81,7 +81,7 @@ class DegradationBase:
         Current implementation assumes that degradation is deterministic, override if it is not the case.
 
         :param images: batch of input images of shape [B, C1, H1, W1] to be degraded
-        :param kwargs: auxillary parameters, required to properly simulate degradation
+        :param kwargs: auxiliary parameters, required to properly simulate degradation
         :return: degraded batch of images of shape [B, C2, H2, W2]
         """
         return self.degrade(images)
@@ -93,7 +93,7 @@ class LinearDegradationBase(DegradationBase):
     """
     def __init__(self, likelihood_loss: Callable = F.mse_loss) -> None:
         """
-        Initializing everything that is needed to perfrom a linear degradation
+        Initializing everything that is needed to perform a linear degradation
 
         :param likelihood_loss: callable function to compute loss, should return a tensor of size 1
         """
@@ -147,7 +147,7 @@ class LinearDegradationBase(DegradationBase):
     def init_latent_images(self, degraded_images: th.Tensor) -> th.Tensor:
         """
         This method is used to init latent images from degraded ones for the first restoration step.
-        For linear degradation the transposed operation is usually used as approximation of inversed one.
+        For linear degradation the transposed operation is usually used as approximation of inverse one.
 
         :param degraded_images: batch of images of shape [B, C1, H1, W1] to create latent ones
         :return: initialized latent images of shape [B, C2, H2, W2]
@@ -185,7 +185,8 @@ class NetworkDegradationBase(DegradationBase):
     """
     This class represents degradation, approximated by some neural network (NN)
     """
-    def __init__(self, degradation_network: nn.Module, likelihood_loss: Callable, device: str = 'cpu') -> None:
+    def __init__(self, degradation_network: nn.Module, likelihood_loss: Callable,
+                 device: Union[str, th.device] = 'cpu') -> None:
         super().__init__(likelihood_loss)
         self.degradation_network = degradation_network.to(device=device)
         self.degradation_network.train(False)
@@ -199,13 +200,24 @@ class NetworkDegradationBase(DegradationBase):
         :param images: input batch of images [B, C1, H1, W1], which should be degraded
         :return: batch of degraded images [B, C2, H2, W2]
         """
-        return self.degradation_network(self._normalize(images))
+        return self.degradation_network(self._normalize_images(images))
 
-    def _normalize(self, images: th.Tensor) -> th.Tensor:
+    @staticmethod
+    def _normalize_images(images: th.Tensor) -> th.Tensor:
         """
         Method, which normalizes images before passing it to neural network.
 
         :param images: batch of images of shape [B, C, H, W] to normalize
         :return: batch of normalized images of shape [B, C, H, W]
+        """
+        return images
+
+    @staticmethod
+    def _denormalize_images(images: th.Tensor) -> th.Tensor:
+        """
+        Method, which denormalizes images after neural network for visualization purposes.
+
+        :param images: batch of images of shape [B, C, H, W] to denormalize
+        :return: batch of denormalized images of shape [B, C, H, W]
         """
         return images

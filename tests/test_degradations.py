@@ -117,7 +117,6 @@ class TestDegradationBlur(TestLinearDegradationBase):
     def init_test_class(self, batch_size, channels_number, spatial_dims, kernel_size=5):
         self.degradation_class = BlurDegradation(th.rand(batch_size, 1, kernel_size, kernel_size).double())
 
-
     def test_convolution(self, kwargs=None):
         """
         Checks whether batched convolution is computed correctly - compare it with scipy.signal.convolve2d.

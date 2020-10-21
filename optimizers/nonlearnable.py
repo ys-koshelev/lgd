@@ -1,6 +1,6 @@
 from .base import OptimizerBase
 from degradations import DegradationBase
-from typing import Tuple, Callable, Dict, Any
+from typing import Callable, Dict, Any
 import torch as th
 import torch.nn as nn
 
@@ -14,21 +14,22 @@ class TorchGradientOptimizer(OptimizerBase):
     optimizer_hyperparams: Dict[str, Any]
 
     def __init__(self, degradation: DegradationBase, num_steps: int, prior_function: Callable, prior_weight: float,
-                 projection_function: Callable, optimizer: th.optim.Optimizer, **optimizer_kwargs) -> None:
+                 projection_function: Callable, optimizer: Callable, **optimizer_kwargs) -> None:
         """
         Initializing all instances, required for optimization.
 
         :param degradation: function, which provides degradation model
         :param num_steps: number of optimizer steps to perform for restoration
         :param prior_function: function, which is called to calculate images priors
-        :param prior_weight: regularization weight to scale the prior value properly (usually is as hyperparameter)
+        :param prior_weight: regularization weight to scale the prior value properly (usually is as hyper-parameter)
         :param projection_function: function, which is called to explicitly project images to some specific domain
         """
         super().__init__(degradation, num_steps, prior_function, prior_weight, projection_function)
         self.optimizer = optimizer
         self.optimizer_hyperparams = optimizer_kwargs
 
-    def _initialize_params(self, images: th.Tensor) -> nn.Parameter:
+    @staticmethod
+    def _initialize_params(images: th.Tensor) -> nn.Parameter:
         """
         Method, which casts input tensor to nn.Parameter to perform optimization on it.
 
@@ -41,7 +42,7 @@ class TorchGradientOptimizer(OptimizerBase):
 
     def _initialize_optimizer(self, images: nn.Parameter) -> th.optim.Optimizer:
         """
-        Method, which initializes PyTorch optimizer with required params and hyperparams.
+        Method, which initializes PyTorch optimizer with required parameters and hyper-parameters.
 
         :param images: input tensor, casted to nn.Parameter, which should be optimized
         :return: PyTorch optimizer, initialized for images
@@ -52,7 +53,7 @@ class TorchGradientOptimizer(OptimizerBase):
     def perform_step(self, latent_images: nn.Parameter, degraded_images: th.Tensor,
                      optimizer: th.optim.Optimizer) -> th.Tensor:
         """
-        This method perfomrs a minimization step on objective, using PyTorch autograd mechanics and PyTorch optimizer.
+        This method performs a minimization step on objective, using PyTorch autograd mechanics and PyTorch optimizer.
         Here it is assumed, that input tensor was already casted to nn.Parameter and to self.optimizer was initialized.
 
         :param latent_images: batch of current images estimates of shape [B, C1, H1, W1], wrapped with nn.Parameter
