@@ -18,7 +18,7 @@ class TestDegradationBase:
 
     def init_test_class(self, *args, **kwargs) -> DegradationBase:
         """
-        SHOULD ASSIGN TO self.degradation_class A DEGRADATION CLASS WITH DOUBLE DTYPES
+        SHOULD ASSIGN TO self.degradation_class: A DEGRADATION CLASS WITH DOUBLE DTYPES
         """
         pass
 

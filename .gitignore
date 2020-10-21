@@ -131,3 +131,4 @@ dmypy.json
 # Forked repos
 #forked
 !forked/mit_semseg/*
+tests/test_interactive.py
