@@ -1,8 +1,12 @@
-from degradations import DegradationBase
+import abc
+from typing import Callable, Union, List
+
 import torch as th
 import torch.nn as nn
-import abc
-from typing import Callable
+
+from degradations import DegradationBase
+from functions.priors import ZeroPrior
+from functions.projections import IdentityProjection
 
 
 class OptimizerBase:
@@ -15,8 +19,8 @@ class OptimizerBase:
     projection_function: Callable
     reg_weight: float
 
-    def __init__(self, degradation: DegradationBase, num_steps: int, prior_function: Callable, prior_weight: float,
-                 projection_function: Callable) -> None:
+    def __init__(self, degradation: DegradationBase, num_steps: int, prior_function: Callable = None,
+                 prior_weight: float = 0, projection_function: Callable = None) -> None:
         """
         Initializing all instances, required for optimization.
 
@@ -28,8 +32,14 @@ class OptimizerBase:
         """
         self.degradation = degradation
         self.num_steps = num_steps
-        self.prior_function = prior_function
-        self.projection_function = projection_function
+        if projection_function is None:
+            self.prior_function = ZeroPrior()
+        else:
+            self.prior_function = prior_function
+        if projection_function is None:
+            self.projection_function = IdentityProjection()
+        else:
+            self.projection_function = projection_function
         self.reg_weight = prior_weight
 
     @abc.abstractmethod
@@ -64,18 +74,28 @@ class OptimizerBase:
         prior = self.prior(latent_images)
         return likelihood + prior
 
-    def restore(self, degraded_images: th.Tensor) -> th.Tensor:
+    def restore(self, degraded_images: th.Tensor, track_updates_history: bool = False
+                ) -> Union[List[th.Tensor], th.Tensor]:
         """
         This method performs restoration of input degraded images.
 
         :param degraded_images: batch of degraded images of shape [B, C, H, W] needed for restoration
+        :param track_updates_history: if set to True, latent images after each step are not discarded
+        and a list of images from all updates is returned instead of last latent estimate
         :return: restored images of shape [B, C, H, W]
         """
+        if track_updates_history:
+            history = []
         latent_images = self.degradation.init_latent_images(degraded_images)
         for i in range(self.num_steps):
             latent_images = self.perform_step(latent_images, degraded_images)
             latent_images = self.project(latent_images)
-        return latent_images
+            if track_updates_history:
+                history.append(latent_images)
+        if track_updates_history:
+            return history
+        else:
+            return latent_images
 
     def project(self, images: th.Tensor) -> th.Tensor:
         """
@@ -88,20 +108,14 @@ class OptimizerBase:
         """
         return self.projection_function(images)
 
-
-class CNNOptimizerBase(OptimizerBase, nn.Module):
-    """
-    Base class for all optimizers.
-    """
-    degradation: DegradationBase
-    latent_image: th.Tensor
-    optimizer_network: nn.Module
-
-    def __init__(self, network: nn.Module, num_steps: int) -> None:
+    @staticmethod
+    def _cast_to_parameter(images: th.Tensor) -> nn.Parameter:
         """
-        Initialize a CNN optimizer
-        :param network:
-        :param num_steps:
+        Method, which casts input tensor to nn.Parameter to perform optimization on it.
+
+        :param images: input tensor to be casted to nn.Parameter
+        :return: nn.Parameter with data, given by input tensor
         """
-        self.optimizer_network = network
-        self.num_steps = num_steps
+        param_images = nn.Parameter(images)
+        param_images.requires_grad = True
+        return param_images

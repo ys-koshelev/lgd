@@ -28,18 +28,6 @@ class TorchGradientOptimizer(OptimizerBase):
         self.optimizer = optimizer
         self.optimizer_hyperparams = optimizer_kwargs
 
-    @staticmethod
-    def _initialize_params(images: th.Tensor) -> nn.Parameter:
-        """
-        Method, which casts input tensor to nn.Parameter to perform optimization on it.
-
-        :param images: input tensor to be casted to nn.Parameter
-        :return: nn.Parameter with data, given by input tensor
-        """
-        param_images = nn.Parameter(images)
-        param_images.requires_grad = True
-        return param_images
-
     def _initialize_optimizer(self, images: nn.Parameter) -> th.optim.Optimizer:
         """
         Method, which initializes PyTorch optimizer with required parameters and hyper-parameters.
@@ -80,7 +68,7 @@ class TorchGradientOptimizer(OptimizerBase):
         :return: restored images of shape [B, C, H, W]
         """
         latent_images = self.degradation.init_latent_images(degraded_images)
-        latent_images = self._initialize_params(latent_images)
+        latent_images = self._cast_to_parameter(latent_images)
         optimizer = self._initialize_optimizer(latent_images)
         for i in range(self.num_steps):
             self.perform_step(latent_images, degraded_images, optimizer)

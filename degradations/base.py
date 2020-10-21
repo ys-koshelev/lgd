@@ -41,19 +41,25 @@ class DegradationBase:
         """
         return self.likelihood_loss(self.degrade(latent_images), degraded_images)
 
-    def grad_likelihood(self, degraded_images: th.Tensor, latent_images: th.Tensor) -> th.Tensor:
+    def grad_likelihood(self, degraded_images: th.Tensor, latent_images: th.Tensor,
+                        propagate_gradients_through_grad: bool = False) -> th.Tensor:
         """
         Method, that computes gradient of a likelihood function w.r.t. current latent images estimate.
         General case - computing gradients using autograd mechanics.
 
         :param degraded_images: batch of degraded images
         :param latent_images: batch of current latent images estimate
+        :param propagate_gradients_through_grad: if True, gradients will be backpropagated through this operation
         :return: gradient of data fidelity between degraded images and current latent estimates
         """
-        latent_images.requires_grad = True
-        data_fidelity = self.likelihood(degraded_images, latent_images)
-        grad = th.autograd.grad(data_fidelity, latent_images)[0]
-        latent_images.requires_grad = False
+        def func(x):
+            return self.likelihood(degraded_images, x)
+        if propagate_gradients_through_grad and (degraded_images.requires_grad or latent_images.requires_grad):
+            create_graph = True
+        else:
+            # no need to create useless graph, if none of inputs requires gradient
+            create_graph = False
+        grad = th.autograd.functional.vjp(func, latent_images, create_graph=create_graph)[1]
         return grad
 
     def init_latent_images(self, degraded_images: th.Tensor) -> th.Tensor:

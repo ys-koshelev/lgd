@@ -16,7 +16,7 @@ class SegmentationDegradation(NetworkDegradationBase):
                                                   ModelBuilder.build_decoder('ppm_deepsup'))
         segmentation_network.encoder.load_state_dict(th.load('pretrained/encoder_epoch_20.pth', map_location='cpu'))
         segmentation_network.decoder.load_state_dict(th.load('pretrained/decoder_epoch_20.pth', map_location='cpu'))
-        super().__init__(segmentation_network, nn.CrossEntropyLoss, device=device)
+        super().__init__(segmentation_network, nn.CrossEntropyLoss(), device=device)
         self.colors = loadmat('pretrained/color150.mat')['colors']
 
     def init_latent_images(self, labels: th.Tensor) -> th.Tensor:
@@ -29,5 +29,5 @@ class SegmentationDegradation(NetworkDegradationBase):
         images_batch = []
         for label in labels:
             images_batch.append(th.from_numpy(colorEncode(label.detach().cpu().numpy(), self.colors, mode='RGB')))
-        images_batch = th.stack(images_batch, dim=0).to(device=labels.device).permute(0, 3, 1, 2).float()/255
-        return images_batch
+        images_batch = th.stack(images_batch, dim=0).to(device=labels.device).permute(0, 3, 1, 2).contiguous().float()
+        return images_batch/255
