@@ -1,15 +1,18 @@
+from argparse import Namespace
+
 import numpy as np
+import torch as th
 
 from forked.SPADE.data.ade20k_dataset import ADE20KDataset
 from .kernels import GaussianKernelSampler, ShakeKernelSampler
-from argparse import Namespace
+
 
 class NoiseDataset(ADE20KDataset):
     """
     Wrapper, which adds noise stds to dataset
     """
     def __init__(self, min_std: float, max_std: float, dataset_root: str, train_phase: str = 'train',
-                 max_dataset_length: int = 1000, out_images_size: int = 256) -> None:
+                 max_dataset_length: int = 1000, out_images_size: int = 256, grayscale_output: bool = False) -> None:
         """
         :param min_std: lower bound value of noise standard deviation to use in degradation
         :param max_std: upper bound value of noise standard deviation to use in degradation
@@ -17,16 +20,20 @@ class NoiseDataset(ADE20KDataset):
         :param train_phase: should be either train, val or test
         :param max_dataset_length: maximum length of dataset
         :param out_images_size: size of images to be outputed by this dataset
+        :param grayscale_output: if True, image is converted to return grayscale
         """
         self.min_std = min_std
         self.max_std = max_std
         opts = self.get_options(dataset_root, train_phase, max_dataset_length, out_images_size)
         self.initialize(opts)
+        self.grayscale_output = grayscale_output
 
     def __getitem__(self, item):
         data = super().__getitem__(item)
         noise_std = self.min_std + np.random.rand()*(self.max_std - self.min_std)
         data.update({'noise_std': noise_std})
+        if self.grayscale_output:
+            data['image'] = self.color2grayscale(data['image'])
         return data
 
     def get_options(self, root_dir: str, phase: str, max_size: int, crop_size: int) -> Namespace:
@@ -46,6 +53,19 @@ class NoiseDataset(ADE20KDataset):
         options.no_flip = False
         options.label_nc = 150
         return options
+
+    @staticmethod
+    def color2grayscale(image: th.Tensor) -> th.Tensor:
+        """
+        Cenerting color image to grayscale
+
+        :param image: input image of shape [C, H, W], given in RGB channels order
+        :return: grayscale image of shape [1, H, W]
+        """
+        assert image.shape[0] == 3
+        r, g, b = image
+        gray = 0.299*r + 0.587*r + 0.114*b
+        return gray.unsqueeze(0)
 
 
 class DownscalingDataset(NoiseDataset):
