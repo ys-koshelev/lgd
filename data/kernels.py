@@ -144,7 +144,7 @@ class GaussianKernelSampler(KernelSamplerBase):
 
         # Normalize the kernel and return
         kernel = raw_kernel_centered / np.sum(raw_kernel_centered)
-        return kernel
+        return kernel.astype(np.float32)
 
 
 class ShakeKernelSampler(KernelSamplerBase):
@@ -278,7 +278,7 @@ class ShakeKernelSampler(KernelSamplerBase):
         kernel = self._sample_with_possible_bad()
         while np.any(np.isnan(kernel)):
             kernel = self._sample_with_possible_bad()
-        return kernel
+        return kernel.astype(np.float32)
 
     def _sample_with_possible_bad(self) -> np.array:
         """

@@ -155,9 +155,9 @@ class DownscaleDegradation(BlurDegradation):
         super().__init__(downscale_kernels, noise_std, kernel_size, device)
         self.scale_factor = scale_factor
         if downscale_kernels is None:
-            self.kernels_sampler = GaussianKernelSampler(kernel_size)
+            self.kernels_sampler = GaussianKernelSampler(kernel_size, scale_factor)
         else:
-            self.kernels_sampler = GaussianKernelSampler(downscale_kernels.shape[-1])
+            self.kernels_sampler = GaussianKernelSampler(downscale_kernels.shape[-1], scale_factor)
 
     def linear_transform(self, latent_images: th.Tensor) -> th.Tensor:
         """
@@ -258,4 +258,5 @@ class DownscaleDegradation(BlurDegradation):
         upscaled[:, :, :, :, coordinate, coordinate] = degraded_images.unsqueeze(0).unsqueeze(0)
         upscaled = upscaled.permute(0, 1, 4, 5, 2, 3).flatten(start_dim=-2).flatten(start_dim=1, end_dim=-2)
         upscaled = F.fold(upscaled, hw, self.scale_factor, stride=self.scale_factor)
+        upscaled = self._valid_convolve_transposed(upscaled, self.kernels)
         return upscaled

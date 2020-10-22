@@ -50,6 +50,7 @@ def train_deblur_sr(net, trainloader, optimizer, criterion, num_epoch):
                 loss += criterion(img, labels)
             loss.backward()
             optimizer.step()
+            print(loss.detach().numpy())
 
             # print statistics
             running_loss += loss.item()
