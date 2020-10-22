@@ -12,10 +12,12 @@ class LearnedGradientDescentOptimizer(nn.Module, OptimizerBase):
     """
     backbone: nn.Module
     backprop_through_gradlikelihood: bool
+    hidden_state_num_channels: int
 
     def __init__(self, degradation: DegradationBase, optimizer_network: nn.Module, num_steps: int,
                  projection_function: Callable = None, backprop_through_gradlikelihood: bool = False,
-                 hidden_state_network: nn.Module = None, device: Union[th.device, str] = 'cpu') -> None:
+                 hidden_state_network: nn.Module = None, device: Union[th.device, str] = 'cpu',
+                 hidden_state_num_channels: int = None) -> None:
         """
         Initialize a learnable gradient descent optimizer
 
@@ -25,6 +27,7 @@ class LearnedGradientDescentOptimizer(nn.Module, OptimizerBase):
         :param backprop_through_gradlikelihood: if True, likelihood gradients will are included to autograd graph
         :param hidden_state_network: neural network used to calculate running hidden state of lgd optimizer
         :param device: device to run optimization and training
+        :param hidden_state_num_channels: number of output channels of hidden state network
         """
         super().__init__()
         self.degradation = degradation
@@ -37,7 +40,9 @@ class LearnedGradientDescentOptimizer(nn.Module, OptimizerBase):
             self.projection_function = projection_function
         self.hidden_state_backbone = hidden_state_network
         if hidden_state_network is not None:
+            assert isinstance(hidden_state_num_channels, int)
             self.hidden_state_backbone = self.hidden_state_backbone.to(device=device)
+            self.hidden_state_num_channels = hidden_state_num_channels
 
     def perform_step(self, latent_images: th.Tensor, degraded_images: th.Tensor, hidden_state: th.Tensor = None
                      ) -> th.Tensor:
@@ -56,8 +61,8 @@ class LearnedGradientDescentOptimizer(nn.Module, OptimizerBase):
 
         if self.hidden_state_backbone is not None:
             assert hidden_state is not None
-            hidden_state = self.backbone(th.cat((network_input, hidden_state), dim=1))
-            network_input = th.cat((network_input, hidden_state))
+            hidden_state = self.hidden_state_backbone(th.cat((network_input, hidden_state), dim=1))
+            network_input = th.cat((network_input, hidden_state), dim=1)
 
         update_step = self.backbone(network_input)
         return latent_images + update_step, hidden_state
@@ -76,7 +81,8 @@ class LearnedGradientDescentOptimizer(nn.Module, OptimizerBase):
             history = []
         latent_images = self.degradation.init_latent_images(degraded_images)
         if self.hidden_state_backbone is not None:
-            hidden_state = th.zeros_like(latent_images)
+            hidden_state = th.zeros(latent_images.shape[0], self.hidden_state_num_channels, *latent_images.shape[-2:],
+                                    dtype=latent_images.dtype, device=latent_images.device)
         else:
             hidden_state = None
         for i in range(self.num_steps):
