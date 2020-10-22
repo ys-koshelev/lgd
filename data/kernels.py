@@ -4,6 +4,7 @@ from typing import List
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.ndimage import measurements, interpolation
+import torch as th
 
 
 class KernelSamplerBase:
@@ -31,6 +32,14 @@ class KernelSamplerBase:
             ax[i].imshow(self.sample_kernel())
             ax[i].axis('off')
         plt.show()
+
+    def sample_kernels_batch(self, batch_size: int) -> th.Tensor:
+        """
+        This method samples batch of kernels
+
+        :param batch_size:
+        :return:
+        """
 
 
 class GaussianKernelSampler(KernelSamplerBase):
