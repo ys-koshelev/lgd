@@ -33,7 +33,7 @@ class NoiseDataset(ADE20KDataset):
         noise_std = self.min_std + np.random.rand()*(self.max_std - self.min_std)
         data.update({'noise_std': noise_std})
         if self.grayscale_output:
-            data['image'] = self.color2grayscale(data['image'])
+            data['images'] = self.color2grayscale(data['images'])
         return data
 
     def get_options(self, root_dir: str, phase: str, max_size: int, crop_size: int) -> Namespace:
@@ -87,7 +87,7 @@ class DownscalingDataset(NoiseDataset):
     def __getitem__(self, item):
         data = super().__getitem__(item)
         kernel = self.kernels_sampler.sample_kernel()[None, :, :]
-        data.update({'kernel': kernel})
+        data.update({'kernels': kernel})
         return data
 
 
@@ -109,5 +109,5 @@ class ShakeBlurDataset(NoiseDataset):
     def __getitem__(self, item):
         data = super().__getitem__(item)
         kernel = self.kernels_sampler.sample_kernel()[None, :, :]
-        data.update({'kernel': kernel})
+        data.update({'kernels': kernel})
         return data
