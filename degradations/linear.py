@@ -1,9 +1,10 @@
-from typing import Callable
+from typing import Callable, Union
 
 import torch as th
 import torch.nn.functional as F
 
 from .base import LinearDegradationBase
+from data.kernels import GaussianKernelSampler, ShakeKernelSampler
 
 
 class NoiseDegradation(LinearDegradationBase):
@@ -33,12 +34,16 @@ class BlurDegradation(LinearDegradationBase):
     """
     This is a class for blur degradation of the form y = k * x + n, where k - blur kernel, n - i.i.d. Gaussian noise
     """
-    def __init__(self, blur_kernels: th.Tensor, likelihood_loss: Callable = F.mse_loss) -> None:
+    def __init__(self, blur_kernels: th.Tensor = None, noise_std: float = 0, kernel_size: int = 21) -> None:
         """
         Initializing everything that is needed to perform degradation
         """
-        super().__init__(likelihood_loss)
+        super().__init__(noise_std)
         self.kernels = blur_kernels
+        if blur_kernels is None:
+            self.kernels_sampler = ShakeKernelSampler(kernel_size)
+        else:
+            self.kernels_sampler = ShakeKernelSampler(blur_kernels.shape[-1])
 
     def linear_transform(self, latent_images: th.Tensor) -> th.Tensor:
         """
@@ -96,7 +101,7 @@ class BlurDegradation(LinearDegradationBase):
                                  groups=kernels.shape[0]).transpose(1, 0)
         return ret
 
-    def replace_kernels(self, new_kernels: th.Tensor) -> None:
+    def update_parameters(self, new_kernels: th.Tensor, noise_std: Union[th.Tensor, float] = None) -> None:
         """
         This method allows to change degradation kernels inplace without re-initializing degradation class.
 
@@ -106,6 +111,24 @@ class BlurDegradation(LinearDegradationBase):
         assert new_kernels.ndim == 4
         assert new_kernels.shape[1] == 1
         self.kernels = new_kernels.to(self.kernels)
+        if noise_std is not None:
+            self.noise_std = noise_std
+
+    def init_random_parameters(self, batch_size: int, noise_std_min: Union[th.Tensor, float],
+                               noise_std_max: Union[th.Tensor, float]) -> None:
+        super().init_random_parameters(batch_size, noise_std_min, noise_std_max)
+        kernels = self.kernels_sampler.sample_kernels_batch(batch_size)
+        if self.kernels is not None:
+            kernels = kernels.to(self.kernels)
+        self.kernels = kernels
+
+    def to(self, *args, **kwargs) -> None:
+        """
+        Change kernels attributes and location
+        :param args, kwargs: arguments, stating tensor attributes
+        :return:
+        """
+        self.kernels = self.kernels.to(*args, **kwargs)
 
 
 class DownscaleDegradation(BlurDegradation):
@@ -113,12 +136,17 @@ class DownscaleDegradation(BlurDegradation):
     This is a class for downscale degradation of the form y = D(k * x) + n = D K x + n,
     where D - decimation operator, k - blur kernel, K - convolution matrix, n - i.i.d. Gaussian noise
     """
-    def __init__(self, scale_factor: int, downscale_kernels: th.Tensor, likelihood_loss: Callable = F.mse_loss) -> None:
+    def __init__(self, scale_factor: int, downscale_kernels: th.Tensor = None,
+                 noise_std: float = 0, kernel_size: int = 13) -> None:
         """
         Initializing kernels and scale factor needed to perform degradation
         """
-        super().__init__(downscale_kernels, likelihood_loss)
+        super().__init__(downscale_kernels, noise_std, kernel_size)
         self.scale_factor = scale_factor
+        if downscale_kernels is None:
+            self.kernels_sampler = GaussianKernelSampler(kernel_size)
+        else:
+            self.kernels_sampler = GaussianKernelSampler(downscale_kernels.shape[-1])
 
     def linear_transform(self, latent_images: th.Tensor) -> th.Tensor:
         """

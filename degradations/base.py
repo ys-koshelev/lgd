@@ -1,5 +1,5 @@
 import abc
-from typing import Callable, Union
+from typing import Callable, Union, Dict, Any
 
 import torch as th
 import torch.nn as nn
@@ -71,17 +71,19 @@ class DegradationBase:
         """
         return degraded_images
 
-    def degrade_ground_truth(self, gt_images: th.Tensor) -> th.Tensor:
+    def init_random_parameters_and_degrade(self, gt_images: th.Tensor, *args, **kwargs) -> th.Tensor:
         """
-        Auxiliary method to perform synthetic degradation of ground truth images, assuming known degradation model
-        IMPORTANT: implementation for the case, when degradation is deterministic. May contain non-differentiable ops.
+        Auxiliary method to initize parameters randomly and perform synthetic degradation of ground truth images,
+        assuming known degradation model
 
         :param gt_images: batch of images [B, C1, H1, W1] to perform a synthetic degradation
+        :param args, kwargs: inputs used to random sampling of parameters
         :return: batch of degraded images [B, C2, H2, W2]
         """
-        pass
+        self.init_parameters_random(gt_images.shape[0], *args, **kwargs)
+        return self.simulate_degradation(gt_images)
 
-    def simulate(self, images: th.Tensor, **kwargs):
+    def simulate_degradation(self, images: th.Tensor, **kwargs):
         """
         This method simulates the whole degradation pipeline, including its stochastic (noise) part.
         Current implementation assumes that degradation is deterministic, override if it is not the case.
@@ -92,18 +94,38 @@ class DegradationBase:
         """
         return self.degrade(images)
 
+    def init_parameters(self, *args, **kwargs) -> None:
+        """
+        This method allows to change degradation parameters inplace without re-initializing degradation class.
+
+        :param args, kwargs: inputs with new parameters values
+        :return: Nothing
+        """
+        pass
+
+    def init_random_parameters(self, batch_size: int, *args, **kwargs) -> None:
+        """
+        This method allows to reinitialize degradation parameters randomly without re-initializing degradation class.
+
+        :param batch_size: size of batch to restore, needed to sample different parameters for each image in batch
+        :param args, kwargs: arguments, needed to initialize random instances of degradation
+        :return: Nothing
+        """
+        pass
+
 
 class LinearDegradationBase(DegradationBase):
     """
     This is a base class for all linear degradations of the form y = Ax + n, where n - i.i.d. Gaussian noise
     """
-    def __init__(self, likelihood_loss: Callable = F.mse_loss) -> None:
+    def __init__(self, noise_std: Union[th.Tensor, float]) -> None:
         """
         Initializing everything that is needed to perform a linear degradation
 
-        :param likelihood_loss: callable function to compute loss, should return a tensor of size 1
+        :param noise_std: standard deviation of i.i.d. additive Gaussian noise
         """
-        super().__init__(likelihood_loss)
+        super().__init__(F.mse_loss)
+        self.noise_std = noise_std
 
     @abc.abstractmethod
     def linear_transform(self, latent_images: th.Tensor) -> th.Tensor:
@@ -134,22 +156,6 @@ class LinearDegradationBase(DegradationBase):
         """
         return self.linear_transform(images)
 
-    def degrade_ground_truth(self, gt_images: th.Tensor, std_min: float = 1, std_max: float = 5) -> th.Tensor:
-        """
-        Auxiliary method to perform synthetic degradation of ground truth images, assuming known linear
-        degradation model and zero mean i.i.d. Gaussian noise
-
-        :param gt_images: batch of images [B, C1, H1, W1] to perform a synthetic degradation
-        :param std_min: minimal value of standard deviation of noise
-        :param std_max: maximal value of standard deviation of noise
-        :return: batch of degraded images [B, C2, H2, W2]
-        """
-        degraded = self.linear_transform(gt_images)
-        std = th.rand((gt_images.shape[0], 1, 1, 1), dtype=gt_images.dtype, device=gt_images.device)
-        std = std*(std_max - std_min) + std_min
-        degraded += th.randn_like(degraded)*std
-        return degraded
-
     def init_latent_images(self, degraded_images: th.Tensor) -> th.Tensor:
         """
         This method is used to init latent images from degraded ones for the first restoration step.
@@ -160,31 +166,55 @@ class LinearDegradationBase(DegradationBase):
         """
         return self.linear_transform_transposed(degraded_images)
 
-    def simulate(self, images: th.Tensor, noise_std: Union[float, th.Tensor]):
-        """
-        This method simulates the whole degradation pipeline, including additive noise.
-
-        :param images: batch of input images of shape [B, C1, H1, W1] to be degraded
-        :param noise_std: standard deviations of noise, float or tensor of shape [], [1] or [B]
-        :return: degraded batch of images of shape [B, C2, H2, W2]
-        """
-        degraded = self.degrade(images)
-        noise = th.randn_like(degraded)
+    @staticmethod
+    def _add_noise(images: th.Tensor, noise_std: Union[th.Tensor, float]):
+        noise = th.randn_like(images)
         if isinstance(noise_std, float):
             noise *= noise_std
         elif isinstance(noise_std, th.Tensor):
-            noise_std = noise_std.to(degraded)
+            noise_std = noise_std.to(images)
             if noise_std.ndim == 0 or (noise_std.ndim == 1 and noise_std.shape[0] == 1):
                 noise *= noise_std
-            elif noise_std.ndim == 1 and noise_std.shape[0] == degraded.shape[0]:
+            elif noise_std.ndim == 1 and noise_std.shape[0] == images.shape[0]:
                 noise *= noise_std[:, None, None, None]
             else:
                 raise ValueError(f'Expected standard deviations to have shapes [], [1] or [B], but received tensor '
                                  f'with shape {noise_std.shape}')
         else:
             raise ValueError(f'Expected input parameter noise_std to be either float or torch.Tensor, '
-                             f'but given {noise.__class__}')
-        return degraded + noise
+                             f'but given {noise_std.__class__}')
+        return images + noise
+
+    def simulate_degradation(self, images: th.Tensor):
+        """
+        This method simulates the whole degradation pipeline, including additive noise.
+
+        :param images: batch of input images of shape [B, C1, H1, W1] to be degraded
+        :return: degraded batch of images of shape [B, C2, H2, W2]
+        """
+        degraded = self.degrade(images)
+        degraded = self._add_noise(degraded, self.noise_std)
+        return degraded
+
+    def init_random_parameters(self, batch_size: int, noise_std_min: Union[th.Tensor, float],
+                               noise_std_max: Union[th.Tensor, float]) -> None:
+        """
+        This method allows to reinitialize degradation parameters randomly without re-initializing degradation class.
+
+        :param batch_size: size of batch to restore, needed to sample different parameters for each image in batch
+        :param noise_std_min: lower bound value of noise standard deviation to use in degradation
+        :param noise_std_max: upper bound value of noise standard deviation to use in degradation
+        """
+        self.noise_std = noise_std_min + th.rand(batch_size)*(noise_std_max - noise_std_min)
+
+    @property
+    def params_dict(self) -> Dict[str, th.Tensor]:
+        """
+        Method, which returns all current degradation parameters as a dict
+
+        :return: dict with parameters to be passed as kwargs
+        """
+        return {'noise_std': self.noise_std}
 
 
 class NetworkDegradationBase(DegradationBase):

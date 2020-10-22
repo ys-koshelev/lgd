@@ -37,9 +37,15 @@ class KernelSamplerBase:
         """
         This method samples batch of kernels
 
-        :param batch_size:
-        :return:
+        :param batch_size: number of kernels to sample
+        :return: batch of randomly sampled kernels
         """
+        kernels = []
+        for i in range(batch_size):
+            kernels.append(self.sample_kernel()[None, :, :])
+        kernels = np.stack(kernels, axis=0)
+        kernels = th.from_numpy(kernels)
+        return kernels
 
 
 class GaussianKernelSampler(KernelSamplerBase):
