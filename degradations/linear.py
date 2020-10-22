@@ -29,16 +29,26 @@ class NoiseDegradation(LinearDegradationBase):
         """
         return latent_images
 
+    def init_parameters(self, noise_std: Union[th.Tensor, float]) -> None:
+        """
+        This method allows to change degradation kernels inplace without re-initializing degradation class.
+
+        :param noise_std: stds of noise
+        :return: Nothing
+        """
+        self.noise_std = noise_std
+
 
 class BlurDegradation(LinearDegradationBase):
     """
     This is a class for blur degradation of the form y = k * x + n, where k - blur kernel, n - i.i.d. Gaussian noise
     """
-    def __init__(self, blur_kernels: th.Tensor = None, noise_std: float = 0, kernel_size: int = 21) -> None:
+    def __init__(self, blur_kernels: th.Tensor = None, noise_std: float = 0, kernel_size: int = 21,
+                 device: Union[th.device, str] = 'cpu') -> None:
         """
         Initializing everything that is needed to perform degradation
         """
-        super().__init__(noise_std)
+        super().__init__(noise_std, device)
         self.kernels = blur_kernels
         if blur_kernels is None:
             self.kernels_sampler = ShakeKernelSampler(kernel_size)
@@ -101,11 +111,12 @@ class BlurDegradation(LinearDegradationBase):
                                  groups=kernels.shape[0]).transpose(1, 0)
         return ret
 
-    def update_parameters(self, new_kernels: th.Tensor, noise_std: Union[th.Tensor, float] = None) -> None:
+    def init_parameters(self, new_kernels: th.Tensor, noise_std: Union[th.Tensor, float] = None) -> None:
         """
         This method allows to change degradation kernels inplace without re-initializing degradation class.
 
         :param new_kernels: new kernels to be used to replace existing ones
+        :param noise_std: std of additive i.i.d. Gaussian noise
         :return: Nothing
         """
         assert new_kernels.ndim == 4
@@ -137,11 +148,11 @@ class DownscaleDegradation(BlurDegradation):
     where D - decimation operator, k - blur kernel, K - convolution matrix, n - i.i.d. Gaussian noise
     """
     def __init__(self, scale_factor: int, downscale_kernels: th.Tensor = None,
-                 noise_std: float = 0, kernel_size: int = 13) -> None:
+                 noise_std: float = 0, kernel_size: int = 13, device: Union[th.device, str] = 'cpu') -> None:
         """
         Initializing kernels and scale factor needed to perform degradation
         """
-        super().__init__(downscale_kernels, noise_std, kernel_size)
+        super().__init__(downscale_kernels, noise_std, kernel_size, device)
         self.scale_factor = scale_factor
         if downscale_kernels is None:
             self.kernels_sampler = GaussianKernelSampler(kernel_size)

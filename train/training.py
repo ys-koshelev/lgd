@@ -5,8 +5,8 @@ def train_denoiser(net, trainloader, optimizer, criterion, num_epoch):
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]
-            labels = data['images']
-            net.degradation.init_parameters(data['noise_std'])
+            labels = data['image']
+            net.degradation.init_parameters(data['noise_std'].to(labels))
             inputs = net.degradation.simulate_degradation(labels)
 
             # zero the parameter gradients
@@ -14,9 +14,12 @@ def train_denoiser(net, trainloader, optimizer, criterion, num_epoch):
 
             # forward + backward + optimize
             outputs = net(inputs)
-            loss = criterion(outputs, labels)
+            loss = 0
+            for img in outputs:
+                loss += criterion(img, labels)
             loss.backward()
             optimizer.step()
+            print(loss.detach().numpy())
 
             # print statistics
             running_loss += loss.item()
@@ -33,7 +36,7 @@ def train_deblur_sr(net, trainloader, optimizer, criterion, num_epoch):
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]
-            labels = data['images']
+            labels = data['image']
             net.degradation.init_parameters(data['kernels'], data['noise_std'])
             inputs = net.degradation.simulate_degradation(labels)
 
@@ -42,7 +45,9 @@ def train_deblur_sr(net, trainloader, optimizer, criterion, num_epoch):
 
             # forward + backward + optimize
             outputs = net(inputs)
-            loss = criterion(outputs, labels)
+            loss = 0
+            for img in outputs:
+                loss += criterion(img, labels)
             loss.backward()
             optimizer.step()
 

@@ -33,7 +33,8 @@ class NoiseDataset(ADE20KDataset):
         noise_std = self.min_std + np.random.rand()*(self.max_std - self.min_std)
         data.update({'noise_std': noise_std})
         if self.grayscale_output:
-            data['images'] = self.color2grayscale(data['images'])
+            data['image'] = self.color2grayscale(data['image'])
+        data['image'] = (data['image'] + 1)/2
         return data
 
     def get_options(self, root_dir: str, phase: str, max_size: int, crop_size: int) -> Namespace:

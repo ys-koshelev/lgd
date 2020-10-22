@@ -10,13 +10,15 @@ class DegradationBase:
     """
     This is a base class for all degradations
     """
-    def __init__(self, likelihood_loss: Callable) -> None:
+    def __init__(self, likelihood_loss: Callable, device: Union[th.device, str] = 'cpu') -> None:
         """
         Initializing everything that is needed to perform degradation
 
         :param likelihood_loss: callable function to compute loss, should return a tensor of size 1
+        :param device: device to place internal parameters
         """
         self.likelihood_loss = likelihood_loss
+        self.device = device
 
     @abc.abstractmethod
     def degrade(self, images: th.Tensor) -> th.Tensor:
@@ -118,13 +120,14 @@ class LinearDegradationBase(DegradationBase):
     """
     This is a base class for all linear degradations of the form y = Ax + n, where n - i.i.d. Gaussian noise
     """
-    def __init__(self, noise_std: Union[th.Tensor, float]) -> None:
+    def __init__(self, noise_std: Union[th.Tensor, float], device: Union[th.device, str] = 'cpu') -> None:
         """
         Initializing everything that is needed to perform a linear degradation
 
         :param noise_std: standard deviation of i.i.d. additive Gaussian noise
+        :param device: device to place internal parameters
         """
-        super().__init__(F.mse_loss)
+        super().__init__(F.mse_loss, device)
         self.noise_std = noise_std
 
     @abc.abstractmethod
@@ -155,6 +158,29 @@ class LinearDegradationBase(DegradationBase):
         :return: batch of degraded images [B, C2, H2, W2]
         """
         return self.linear_transform(images)
+
+    def likelihood(self, degraded_images: th.Tensor, latent_images: th.Tensor) -> th.Tensor:
+        """
+        Method to compute likelihood (data fidelity) term of the total energy
+        IMPORTANT: This method should return tensor of size 1.
+
+        :param degraded_images: batch of degraded images
+        :param latent_images: batch of current latent images estimate
+        :return: data fidelity between degraded image and current estimate
+        """
+        return self.likelihood_loss(self.degrade(latent_images)/self._noise_std, degraded_images/self._noise_std)
+
+    @property
+    def _noise_std(self):
+        if isinstance(self.noise_std, float):
+            ret = th.FloatTensor([self.noise_std]).to(device=self.device)
+        elif isinstance(self.noise_std, th.Tensor):
+            assert self.noise_std.ndim == 0 or self.noise_std.ndim == 1
+            ret = self.noise_std.to(device=self.device)
+        dim = ret.ndim
+        for i in range(4 - dim):
+            ret = ret.unsqueeze(-1)
+        return ret
 
     def init_latent_images(self, degraded_images: th.Tensor) -> th.Tensor:
         """
@@ -223,7 +249,7 @@ class NetworkDegradationBase(DegradationBase):
     """
     def __init__(self, degradation_network: nn.Module, likelihood_loss: Callable,
                  device: Union[str, th.device] = 'cpu') -> None:
-        super().__init__(likelihood_loss)
+        super().__init__(likelihood_loss, device)
         self.degradation_network = degradation_network.to(device=device)
         self.degradation_network.train(False)
         for param in self.degradation_network.parameters():
