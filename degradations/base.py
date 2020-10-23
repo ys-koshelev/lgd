@@ -218,8 +218,11 @@ class LinearDegradationBase(DegradationBase):
         :param images: batch of input images of shape [B, C1, H1, W1] to be degraded
         :return: degraded batch of images of shape [B, C2, H2, W2]
         """
+        assert images.min() >= 0 and images.max() <= 1, "Images have to be in natural representation within range " \
+                                                        "[0, 1]"
         degraded = self.degrade(images)
         degraded = self._add_noise(degraded, self.noise_std)
+        degraded = th.clamp(degraded, 0, 1)
         return degraded
 
     def init_random_parameters(self, batch_size: int, noise_std_min: Union[th.Tensor, float],

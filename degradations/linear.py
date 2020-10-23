@@ -18,7 +18,7 @@ class NoiseDegradation(LinearDegradationBase):
         :param latent_images: input batch of images [B, C1, H1, W1], which should be degraded
         :return:batch of degraded images [B, C2, H2, W2]
         """
-        return latent_images
+        return latent_images.clone()
 
     def linear_transform_transposed(self, latent_images: th.Tensor) -> th.Tensor:
         """
@@ -27,7 +27,7 @@ class NoiseDegradation(LinearDegradationBase):
         :param latent_images: input batch of images [B, C1, H1, W1], which should be degraded
         :return:batch of degraded images [B, C2, H2, W2]
         """
-        return latent_images
+        return latent_images.clone()
 
     def init_parameters(self, noise_std: Union[th.Tensor, float]) -> None:
         """

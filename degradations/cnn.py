@@ -32,7 +32,8 @@ class SegmentationDegradation(NetworkDegradationBase):
         for label in labels:
             images_batch.append(th.from_numpy(colorEncode(label.detach().cpu().numpy(), self.colors, mode='RGB')))
         images_batch = th.stack(images_batch, dim=0).to(device=labels.device).permute(0, 3, 1, 2).contiguous().float()
-        return images_batch/255
+        images_batch = images_batch / 255
+        return images_batch
 
     def _normalize_images(self, images: th.Tensor) -> th.Tensor:
         """
@@ -42,5 +43,5 @@ class SegmentationDegradation(NetworkDegradationBase):
         :param images: batch of images of shape [B, C, H, W] to normalize
         :return: batch of normalized images of shape [B, C, H, W]
         """
-        output = (images - self._norm_mean)/self._norm_std
+        output = ((images+2)/4 - self._norm_mean)/self._norm_std
         return output

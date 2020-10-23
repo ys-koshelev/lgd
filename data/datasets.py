@@ -39,7 +39,7 @@ class BSD500ImagesDataset(ADE20KDataset):
         else:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = self.random_crop(image).astype(np.float32)/255
-        image = np.transpose(image, axes=(2, 0, 1))
+        # image = np.transpose(image, axes=(2, 0, 1))
         return {'image': image}
 
     def __len__(self) -> int:
@@ -74,6 +74,11 @@ class ADE20KImageDataset(ADE20KDataset):
         if self.grayscale_output:
             data['image'] = self.color2grayscale(data['image'])
         data['image'] = (data['image'] + 1)/2
+        data['image'] = data['image'].permute(1,2,0).numpy()
+        data['label'] = data['label'][0].numpy()
+        data['label'][data['label'] == 150.] = 149.
+        del data['instance']
+        del data['path']
         return data
 
     def get_options(self, root_dir: str, phase: str, max_size: int, crop_size: int) -> Namespace:
