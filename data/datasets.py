@@ -28,7 +28,7 @@ class BSD500ImagesDataset(ADE20KDataset):
         assert train_phase in ('train', 'val', 'test')
         self.images_paths_list = glob(osp.join(dataset_root, train_phase, '*.jpg'))
         self.grayscale_output = grayscale_output
-        self.dataset_length = max(len(self.images_paths_list), max_dataset_length)
+        self.dataset_length = min(len(self.images_paths_list), max_dataset_length)
         self.crop_size = out_images_size
 
     def __getitem__(self, item):
