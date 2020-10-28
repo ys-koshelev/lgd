@@ -82,7 +82,7 @@ class DegradationBase:
         :param args, kwargs: inputs used to random sampling of parameters
         :return: batch of degraded images [B, C2, H2, W2]
         """
-        self.init_parameters_random(gt_images.shape[0], *args, **kwargs)
+        self.init_random_parameters(gt_images.shape[0], *args, **kwargs)
         return self.simulate_degradation(gt_images)
 
     def simulate_degradation(self, images: th.Tensor, **kwargs):
