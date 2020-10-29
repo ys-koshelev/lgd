@@ -120,14 +120,18 @@ class LinearDegradationBase(DegradationBase):
     """
     This is a base class for all linear degradations of the form y = Ax + n, where n - i.i.d. Gaussian noise
     """
-    def __init__(self, noise_std: Union[th.Tensor, float], device: Union[th.device, str] = 'cpu') -> None:
+    def __init__(self, noise_std: Union[th.Tensor, float], device: Union[th.device, str] = 'cpu',
+                 likelihood_loss: Callable = F.mse_loss) -> None:
         """
         Initializing everything that is needed to perform a linear degradation
+        For linear degradations with Gaussian noise MSE is used as likelihood, however this could be changed
+        if needed by passing likelihood_loss argument in initialization.
 
         :param noise_std: standard deviation of i.i.d. additive Gaussian noise
         :param device: device to place internal parameters
+        :param likelihood_loss: callable function to compute loss, should return a tensor of size 1
         """
-        super().__init__(F.mse_loss, device)
+        super().__init__(likelihood_loss, device)
         self.noise_std = noise_std
 
     @abc.abstractmethod

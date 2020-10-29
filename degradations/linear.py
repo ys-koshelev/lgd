@@ -44,11 +44,11 @@ class BlurDegradation(LinearDegradationBase):
     This is a class for blur degradation of the form y = k * x + n, where k - blur kernel, n - i.i.d. Gaussian noise
     """
     def __init__(self, blur_kernels: th.Tensor = None, noise_std: float = 0, kernel_size: int = 21,
-                 device: Union[th.device, str] = 'cpu') -> None:
+                 device: Union[th.device, str] = 'cpu', likelihood_loss: Callable = F.mse_loss) -> None:
         """
         Initializing everything that is needed to perform degradation
         """
-        super().__init__(noise_std, device)
+        super().__init__(noise_std, device, likelihood_loss=likelihood_loss)
         self.kernels = blur_kernels
         if blur_kernels is None:
             self.kernels_sampler = ShakeKernelSampler(kernel_size)
@@ -148,11 +148,12 @@ class DownscaleDegradation(BlurDegradation):
     where D - decimation operator, k - blur kernel, K - convolution matrix, n - i.i.d. Gaussian noise
     """
     def __init__(self, scale_factor: int, downscale_kernels: th.Tensor = None,
-                 noise_std: float = 0, kernel_size: int = 13, device: Union[th.device, str] = 'cpu') -> None:
+                 noise_std: float = 0, kernel_size: int = 13, device: Union[th.device, str] = 'cpu',
+                 likelihood_loss: Callable = F.mse_loss) -> None:
         """
         Initializing kernels and scale factor needed to perform degradation
         """
-        super().__init__(downscale_kernels, noise_std, kernel_size, device)
+        super().__init__(downscale_kernels, noise_std, kernel_size, device, likelihood_loss=likelihood_loss)
         self.scale_factor = scale_factor
         if downscale_kernels is None:
             self.kernels_sampler = GaussianKernelSampler(kernel_size, scale_factor)
