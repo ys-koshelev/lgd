@@ -7,3 +7,4 @@ torchvision~=0.7.0
 pillow~=7.0.0
 dill~=0.3.2
 scikit-image~=0.16.2
+opencv-python

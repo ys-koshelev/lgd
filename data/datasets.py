@@ -1,9 +1,9 @@
 from argparse import Namespace
-
+import abc
 import numpy as np
 import torch as th
 from torch.utils.data import Dataset
-
+from typing import Dict, Any
 from forked.SPADE.data.ade20k_dataset import ADE20KDataset
 from .kernels import GaussianKernelSampler, ShakeKernelSampler
 from glob import glob
@@ -31,7 +31,7 @@ class BSD500ImagesDataset(ADE20KDataset):
         self.dataset_length = min(len(self.images_paths_list), max_dataset_length)
         self.crop_size = out_images_size
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: int) -> Dict[str, Any]:
         image = random.choice(self.images_paths_list)
         image = cv2.imread(image)
         if self.grayscale_output:
@@ -69,7 +69,7 @@ class ADE20KImageDataset(ADE20KDataset):
         self.initialize(opts)
         self.grayscale_output = grayscale_output
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: int) -> Dict[str, Any]:
         data = super().__getitem__(item)
         if self.grayscale_output:
             data['image'] = self.color2grayscale(data['image'])
@@ -112,8 +112,34 @@ class ADE20KImageDataset(ADE20KDataset):
         gray = 0.299*r + 0.587*r + 0.114*b
         return gray.unsqueeze(0)
 
-# TODO: create DatasetWrapperBase
-class NoiseDatasetWrapper(Dataset):
+
+class DatasetWrapperBase(Dataset):
+    """
+    Base class for implementing a dataset wrapper, which adds or changes some data to existing dataset
+    """
+    dataset: Dataset
+
+    @abc.abstractmethod
+    def augment_data(self, idx: int, data_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        This method returns additional changes to data, which should be added to base dataset output
+
+        :param idx: element index
+        :param data_dict: dict with data, coming from base dataset, which should be augmented
+        :return: dict with augmented data
+        """
+        pass
+
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
+        data = self.dataset[idx]
+        data = self.get_additional_data(idx, data)
+        return data
+
+    def __len__(self):
+        return len(self.dataset)
+
+
+class NoiseDatasetWrapper(DatasetWrapperBase):
     """
     Wrapper, which adds noise stds to dataset
     """
@@ -127,17 +153,20 @@ class NoiseDatasetWrapper(Dataset):
         self.max_std = max_std
         self.dataset = dataset
 
-    def __getitem__(self, idx):
-        data = self.dataset[idx]
+    def augment_data(self, idx: int, data_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Add noise std value to data dict
+
+        :param idx: element index
+        :param data_dict: dict with data, coming from base dataset, which should be augmented
+        :return: dict with added noise std value
+        """
         noise_std = self.min_std + np.random.rand()*(self.max_std - self.min_std)
-        data.update({'noise_std': noise_std})
-        return data
-
-    def __len__(self):
-        return len(self.dataset)
+        data_dict.update({'noise_std': noise_std})
+        return data_dict
 
 
-class DownscalingDatasetWrapper(Dataset):
+class DownscalingDatasetWrapper(DatasetWrapperBase):
     """
     Wrapper, which adds downscale kernels to dataset
     """
@@ -149,17 +178,20 @@ class DownscalingDatasetWrapper(Dataset):
         self.kernels_sampler = GaussianKernelSampler(kernel_size, scale_factor)
         self.dataset = dataset
 
-    def __getitem__(self, idx):
-        data = self.dataset[idx]
+    def augment_data(self, idx: int, data_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Add downscaling kernel to dataset
+
+        :param idx: element index
+        :param data_dict: dict with data, coming from base dataset, which should be augmented
+        :return: dict with added downscale kernels
+        """
         kernel = self.kernels_sampler.sample_kernel()[None, :, :]
-        data.update({'kernels': kernel})
-        return data
-
-    def __len__(self):
-        return len(self.dataset)
+        data_dict.update({'kernels': kernel})
+        return data_dict
 
 
-class ShakeBlurDatasetWrapper(Dataset):
+class ShakeBlurDatasetWrapper(DatasetWrapperBase):
     """
     Wrapper, which adds shake blur kernels to dataset
     """
@@ -171,11 +203,14 @@ class ShakeBlurDatasetWrapper(Dataset):
         self.kernels_sampler = ShakeKernelSampler(kernel_size)
         self.dataset = dataset
 
-    def __getitem__(self, idx):
-        data = self.dataset[idx]
-        kernel = self.kernels_sampler.sample_kernel()[None, :, :]
-        data.update({'kernels': kernel})
-        return data
+    def augment_data(self, idx: int, data_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Add camera shake blur kernel to dataset
 
-    def __len__(self):
-        return len(self.dataset)
+        :param idx: element index
+        :param data_dict: dict with data, coming from base dataset, which should be augmented
+        :return: dict with added camera shake blur kernel
+        """
+        kernel = self.kernels_sampler.sample_kernel()[None, :, :]
+        data_dict.update({'kernels': kernel})
+        return data_dict
