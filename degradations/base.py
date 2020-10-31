@@ -261,6 +261,8 @@ class NetworkDegradationBase(DegradationBase):
         self.degradation_network.train(False)
         for param in self.degradation_network.parameters():
             param.requires_grad = False
+        self._norm_mean = th.Tensor([0.0, 0.0, 0.0]).to(device=device)[None, :, None, None]
+        self._norm_std = th.Tensor([1.0, 1.0, 1.0]).to(device=device)[None, :, None, None]
 
     def degrade(self, images: th.Tensor) -> th.Tensor:
         """
@@ -271,22 +273,22 @@ class NetworkDegradationBase(DegradationBase):
         """
         return self._denormalize_images(self.degradation_network(self._normalize_images(images)))
 
-    @staticmethod
-    def _normalize_images(images: th.Tensor) -> th.Tensor:
+    def _normalize_images(self, images: th.Tensor) -> th.Tensor:
         """
         Method, which normalizes images before passing it to neural network.
 
         :param images: batch of images of shape [B, C, H, W] to normalize
         :return: batch of normalized images of shape [B, C, H, W]
         """
-        return images
+        output = (images - self._norm_mean)/self._norm_std
+        return output
 
-    @staticmethod
-    def _denormalize_images(images: th.Tensor) -> th.Tensor:
+    def _denormalize_images(self, images: th.Tensor) -> th.Tensor:
         """
         Method, which denormalizes images after neural network for visualization purposes.
 
         :param images: batch of images of shape [B, C, H, W] to denormalize
         :return: batch of denormalized images of shape [B, C, H, W]
         """
-        return images
+        output = images*self._norm_std + self._norm_mean
+        return output
