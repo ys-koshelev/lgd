@@ -21,7 +21,7 @@ class BSD500ImagesDataset(ADE20KDataset):
         :param dataset_root: path to dataset root folder
         :param train_phase: should be either train, val or test
         :param max_dataset_length: maximum length of dataset
-        :param out_images_size: size of images to be outputed by this dataset
+        :param out_images_size: size of images to be output by this dataset
         :param grayscale_output: if True, image is converted to return grayscale
         """
         assert train_phase in ('train', 'val', 'test')
